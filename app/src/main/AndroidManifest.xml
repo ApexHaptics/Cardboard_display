@@ -22,6 +22,10 @@
     <!-- Indicates use of VR features that are available only on Daydream-ready devices. -->
     <uses-feature android:name="android.hardware.vr.high_performance" android:required="false"/>
 
+    <!-- For bluetooth communication with the control program on PC. -->
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+
     <application
         android:allowBackup="true"
         android:supportsRtl="true"

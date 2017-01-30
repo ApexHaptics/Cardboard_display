@@ -20,7 +20,6 @@ import android.os.Bundle;
 import android.content.Context;
 import android.opengl.GLES20;
 import android.opengl.Matrix;
-import android.os.Bundle;
 import android.os.Vibrator;
 import android.util.Log;
 import com.google.vr.sdk.audio.GvrAudioEngine;
@@ -126,6 +125,8 @@ public class MainActivity extends GvrActivity implements GvrView.StereoRenderer 
     private volatile int sourceId = GvrAudioEngine.INVALID_ID;
     private volatile int successSourceId = GvrAudioEngine.INVALID_ID;
 
+    private BluetoothService myBluetoothService;
+
     /**
      * Converts a raw text file, saved as a resource, into an OpenGL ES shader.
      *
@@ -164,7 +165,7 @@ public class MainActivity extends GvrActivity implements GvrView.StereoRenderer 
      */
     private static void checkGLError(String label) {
         int error;
-        while ((error = GLES20.glGetError()) != GLES20.GL_NO_ERROR) {
+        if ((error = GLES20.glGetError()) != GLES20.GL_NO_ERROR) {
             Log.e(TAG, label + ": glError " + error);
             throw new RuntimeException(label + ": glError " + error);
         }
@@ -195,6 +196,9 @@ public class MainActivity extends GvrActivity implements GvrView.StereoRenderer 
 
         // Initialize 3D audio engine.
         gvrAudioEngine = new GvrAudioEngine(this, GvrAudioEngine.RenderingMode.BINAURAL_HIGH_QUALITY);
+
+        // Initialize Bluetooth
+        myBluetoothService = new BluetoothService(this.getApplicationContext());
     }
 
     public void initializeGvrView() {

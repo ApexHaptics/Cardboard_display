@@ -51,6 +51,8 @@ public class MainActivity extends GvrActivity implements GvrView.StereoRenderer 
     protected float[] modelCube;
     protected float[] modelPosition;
 
+    protected float[] modelRightHand;
+
     private static final String TAG = "TreasureHuntActivity";
 
     private static final float Z_NEAR = 0.1f;
@@ -87,7 +89,12 @@ public class MainActivity extends GvrActivity implements GvrView.StereoRenderer 
     private FloatBuffer cubeFoundColors;
     private FloatBuffer cubeNormals;
 
+    private FloatBuffer rightHandVertices;
+    private FloatBuffer rightHandColors;
+    private FloatBuffer rightHandNormals;
+
     private int cubeProgram;
+    private int rightHandProgram;
     private int floorProgram;
 
     private int cubePositionParam;
@@ -97,6 +104,14 @@ public class MainActivity extends GvrActivity implements GvrView.StereoRenderer 
     private int cubeModelViewParam;
     private int cubeModelViewProjectionParam;
     private int cubeLightPosParam;
+
+    private int rightHandPositionParam;
+    private int rightHandNormalParam;
+    private int rightHandColorParam;
+    private int rightHandModelParam;
+    private int rightHandModelViewParam;
+    private int rightHandModelViewProjectionParam;
+    private int rightHandLightPosParam;
 
     private int floorPositionParam;
     private int floorNormalParam;
@@ -182,6 +197,7 @@ public class MainActivity extends GvrActivity implements GvrView.StereoRenderer 
         initializeGvrView();
 
         modelCube = new float[16];
+        modelRightHand = new float[16];
         camera = new float[16];
         view = new float[16];
         modelViewProjection = new float[16];
@@ -280,6 +296,25 @@ public class MainActivity extends GvrActivity implements GvrView.StereoRenderer 
         cubeNormals.put(WorldLayoutData.CUBE_NORMALS);
         cubeNormals.position(0);
 
+        // Right hand
+        ByteBuffer bbRhVertices = ByteBuffer.allocateDirect(WorldLayoutData.CUBE_COORDS.length * 4);
+        bbVertices.order(ByteOrder.nativeOrder());
+        rightHandVertices = bbVertices.asFloatBuffer();
+        rightHandVertices.put(WorldLayoutData.CUBE_COORDS);
+        rightHandVertices.position(0);
+
+        ByteBuffer bbRhColors = ByteBuffer.allocateDirect(WorldLayoutData.CUBE_COLORS.length * 4);
+        bbColors.order(ByteOrder.nativeOrder());
+        rightHandColors = bbColors.asFloatBuffer();
+        rightHandColors.put(WorldLayoutData.CUBE_COLORS);
+        rightHandColors.position(0);
+
+        ByteBuffer bbRhNormals = ByteBuffer.allocateDirect(WorldLayoutData.CUBE_NORMALS.length * 4);
+        bbNormals.order(ByteOrder.nativeOrder());
+        rightHandNormals = bbNormals.asFloatBuffer();
+        rightHandNormals.put(WorldLayoutData.CUBE_NORMALS);
+        rightHandNormals.position(0);
+
         // make a floor
         ByteBuffer bbFloorVertices = ByteBuffer.allocateDirect(WorldLayoutData.FLOOR_COORDS.length * 4);
         bbFloorVertices.order(ByteOrder.nativeOrder());
@@ -321,6 +356,25 @@ public class MainActivity extends GvrActivity implements GvrView.StereoRenderer 
         cubeLightPosParam = GLES20.glGetUniformLocation(cubeProgram, "u_LightPos");
 
         checkGLError("Cube program params");
+
+        rightHandProgram = GLES20.glCreateProgram();
+        GLES20.glAttachShader(rightHandProgram, vertexShader);
+        GLES20.glAttachShader(rightHandProgram, passthroughShader);
+        GLES20.glLinkProgram(rightHandProgram);
+        GLES20.glUseProgram(rightHandProgram);
+
+        checkGLError("RightHand program");
+
+        rightHandPositionParam = GLES20.glGetAttribLocation(rightHandProgram, "a_Position");
+        rightHandNormalParam = GLES20.glGetAttribLocation(rightHandProgram, "a_Normal");
+        rightHandColorParam = GLES20.glGetAttribLocation(rightHandProgram, "a_Color");
+
+        rightHandModelParam = GLES20.glGetUniformLocation(rightHandProgram, "u_Model");
+        rightHandModelViewParam = GLES20.glGetUniformLocation(rightHandProgram, "u_MVMatrix");
+        rightHandModelViewProjectionParam = GLES20.glGetUniformLocation(rightHandProgram, "u_MVP");
+        rightHandLightPosParam = GLES20.glGetUniformLocation(rightHandProgram, "u_LightPos");
+
+        checkGLError("RightHand program params");
 
         floorProgram = GLES20.glCreateProgram();
         GLES20.glAttachShader(floorProgram, vertexShader);
@@ -384,6 +438,17 @@ public class MainActivity extends GvrActivity implements GvrView.StereoRenderer 
     }
 
     /**
+     * Updates the cube model position.
+     */
+    protected void updateRightHandPosition() {
+        Matrix.setIdentityM(modelRightHand, 0);
+        Matrix.translateM(modelRightHand, 0, myBluetoothService.rightHand.getX(),
+                myBluetoothService.rightHand.getY(), myBluetoothService.rightHand.getZ());
+
+        checkGLError("updateRightHandPosition");
+    }
+
+    /**
      * Converts a raw text file into a string.
      *
      * @param resId The resource ID of the raw text file about to be turned into a shader.
@@ -414,6 +479,7 @@ public class MainActivity extends GvrActivity implements GvrView.StereoRenderer 
     @Override
     public void onNewFrame(HeadTransform headTransform) {
         setCubeRotation();
+        updateRightHandPosition();
 
         // Build the camera matrix and apply it to the ModelView.
         Matrix.setLookAtM(camera, 0, 0.0f, 0.0f, CAMERA_Z, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
@@ -459,6 +525,11 @@ public class MainActivity extends GvrActivity implements GvrView.StereoRenderer 
         Matrix.multiplyMM(modelViewProjection, 0, perspective, 0, modelView, 0);
         drawCube();
 
+        // for calculating right hand position and light
+        Matrix.multiplyMM(modelView, 0, view, 0, modelRightHand, 0);
+        Matrix.multiplyMM(modelViewProjection, 0, perspective, 0, modelView, 0);
+        drawRightHand();
+
         // Set modelView for the floor, so we draw floor in the correct location
         Matrix.multiplyMM(modelView, 0, view, 0, modelFloor, 0);
         Matrix.multiplyMM(modelViewProjection, 0, perspective, 0, modelView, 0);
@@ -503,6 +574,42 @@ public class MainActivity extends GvrActivity implements GvrView.StereoRenderer 
 
         GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 36);
         checkGLError("Drawing cube");
+    }
+
+    /**
+     * Draw the cube.
+     *
+     * <p>We've set all of our transformation matrices. Now we simply pass them into the shader.
+     */
+    public void drawRightHand() {
+        GLES20.glUseProgram(rightHandProgram);
+
+        GLES20.glUniform3fv(rightHandLightPosParam, 1, lightPosInEyeSpace, 0);
+
+        // Set the Model in the shader, used to calculate lighting
+        GLES20.glUniformMatrix4fv(rightHandModelParam, 1, false, modelRightHand, 0);
+
+        // Set the ModelView in the shader, used to calculate lighting
+        GLES20.glUniformMatrix4fv(rightHandModelViewParam, 1, false, modelView, 0);
+
+        // Set the position of the rightHand
+        GLES20.glVertexAttribPointer(
+                rightHandPositionParam, COORDS_PER_VERTEX, GLES20.GL_FLOAT, false, 0, rightHandVertices);
+
+        // Set the ModelViewProjection matrix in the shader.
+        GLES20.glUniformMatrix4fv(rightHandModelViewProjectionParam, 1, false, modelViewProjection, 0);
+
+        // Set the normal positions of the rightHand, again for shading
+        GLES20.glVertexAttribPointer(rightHandNormalParam, 3, GLES20.GL_FLOAT, false, 0, rightHandNormals);
+        GLES20.glVertexAttribPointer(rightHandColorParam, 4, GLES20.GL_FLOAT, false, 0, rightHandColors);
+
+        // Enable vertex arrays
+        GLES20.glEnableVertexAttribArray(rightHandPositionParam);
+        GLES20.glEnableVertexAttribArray(rightHandNormalParam);
+        GLES20.glEnableVertexAttribArray(rightHandColorParam);
+
+        GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 36);
+        checkGLError("Drawing rightHand");
     }
 
     /**

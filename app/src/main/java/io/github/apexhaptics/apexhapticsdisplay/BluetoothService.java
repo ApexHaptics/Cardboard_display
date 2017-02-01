@@ -23,11 +23,17 @@ import android.bluetooth.BluetoothSocket;
 import android.content.Context;
 import android.util.Log;
 
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.util.Set;
 import java.util.UUID;
+
+import io.github.apexhaptics.apexhapticsdisplay.utilities.Joint;
+
+import static android.R.attr.right;
 
 /**
  * This class does all the work for setting up and managing Bluetooth
@@ -60,6 +66,12 @@ public class BluetoothService {
     public static final int STATE_CONNECTING = 2; // now initiating an outgoing connection
     public static final int STATE_CONNECTED = 3;  // now connected to a remote device
 
+    public Joint headJoint = new Joint();
+    public Joint shoulderCenter = new Joint();
+    public Joint rightWrist = new Joint();
+    public Joint rightHand = new Joint();
+    public Joint leftWrist = new Joint();
+    public Joint leftHand = new Joint();
 
     /**
      * Constructor. Prepares a new BluetoothChat session.
@@ -200,10 +212,6 @@ public class BluetoothService {
             mAcceptThread = null;
         }
 
-        // Start the thread to manage the connection and perform transmissions
-        mConnectedThread = new ConnectedThread(socket);
-        mConnectedThread.start();
-
         // Send the name of the connected device back to the UI Activity
 //        Message msg = mHandler.obtainMessage(Constants.MESSAGE_DEVICE_NAME);
 //        Bundle bundle = new Bundle();
@@ -213,6 +221,10 @@ public class BluetoothService {
         Log.d(TAG,"DEVICE_NAME: " + device.getName());
 
         setState(STATE_CONNECTED);
+
+        // Start the thread to manage the connection and perform transmissions
+        mConnectedThread = new ConnectedThread(socket);
+        mConnectedThread.start();
     }
 
     /**
@@ -435,10 +447,10 @@ public class BluetoothService {
      */
     private class ConnectedThread extends Thread {
         private final BluetoothSocket mmSocket;
-        private final InputStream mmInStream;
+        private final BufferedReader mmBufferedReader;
         private final OutputStream mmOutStream;
 
-        public ConnectedThread(BluetoothSocket socket) {
+        ConnectedThread(BluetoothSocket socket) {
             Log.d(TAG, "create ConnectedThread");
             mmSocket = socket;
             InputStream tmpIn = null;
@@ -452,31 +464,47 @@ public class BluetoothService {
                 Log.e(TAG, "temp sockets not created", e);
             }
 
-            mmInStream = tmpIn;
             mmOutStream = tmpOut;
+            mmBufferedReader = new BufferedReader(new InputStreamReader(tmpIn));
         }
 
         public void run() {
             Log.i(TAG, "BEGIN mConnectedThread");
-            byte[] buffer = new byte[1024];
-            int bytes;
+            String[] coords;
 
             // Keep listening to the InputStream while connected
             while (mState == STATE_CONNECTED) {
                 try {
-                    // Read from the InputStream
-                    bytes = mmInStream.read(buffer);
-
                     // Send the obtained bytes to the UI Activity
 //                    mHandler.obtainMessage(Constants.MESSAGE_READ, bytes, -1, buffer)
 //                            .sendToTarget();
-                    Log.d(TAG,"MESSAGE_READ:" + bytes);
+                    coords = mmBufferedReader.readLine().split(",");
+                    headJoint.setCoords(Float.parseFloat(coords[1]),
+                            Float.parseFloat(coords[3]),
+                            Float.parseFloat(coords[5]));
+                    shoulderCenter.setCoords(Float.parseFloat(coords[7]),
+                            Float.parseFloat(coords[9]),
+                            Float.parseFloat(coords[11]));
+                    rightWrist.setCoords(Float.parseFloat(coords[13]),
+                            Float.parseFloat(coords[15]),
+                            Float.parseFloat(coords[17]));
+                    rightHand.setCoords(Float.parseFloat(coords[19]),
+                            Float.parseFloat(coords[21]),
+                            Float.parseFloat(coords[23]));
+                    leftWrist.setCoords(Float.parseFloat(coords[25]),
+                            Float.parseFloat(coords[27]),
+                            Float.parseFloat(coords[31]));
+                    leftHand.setCoords(Float.parseFloat(coords[33]),
+                            Float.parseFloat(coords[35]),
+                            Float.parseFloat(coords[37]));
                 } catch (IOException e) {
                     Log.e(TAG, "disconnected", e);
                     connectionLost();
                     // Start the service over to restart listening mode
                     BluetoothService.this.start();
                     break;
+                } catch (ArrayIndexOutOfBoundsException e) {
+                    Log.e(TAG, "Incorrectly formatted message");
                 }
             }
         }
@@ -486,7 +514,7 @@ public class BluetoothService {
          *
          * @param buffer The bytes to write
          */
-        public void write(byte[] buffer) {
+        void write(byte[] buffer) {
             try {
                 mmOutStream.write(buffer);
 
@@ -499,7 +527,7 @@ public class BluetoothService {
             }
         }
 
-        public void cancel() {
+        void cancel() {
             try {
                 mmSocket.close();
             } catch (IOException e) {

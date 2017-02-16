@@ -38,6 +38,10 @@ import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 import javax.microedition.khronos.egl.EGLConfig;
 
+import io.github.apexhaptics.apexhapticsdisplay.datatypes.BluetoothDataPacket;
+import io.github.apexhaptics.apexhapticsdisplay.datatypes.Joint;
+import io.github.apexhaptics.apexhapticsdisplay.datatypes.JointPacket;
+
 /**
  * A Google VR sample application.
  * </p><p>
@@ -442,8 +446,17 @@ public class MainActivity extends GvrActivity implements GvrView.StereoRenderer 
      */
     protected void updateRightHandPosition() {
         Matrix.setIdentityM(modelRightHand, 0);
-        Matrix.translateM(modelRightHand, 0, myBluetoothService.rightHand.getX(),
-                myBluetoothService.rightHand.getY(), myBluetoothService.rightHand.getZ());
+        BluetoothDataPacket packet = myBluetoothService.getLastPacket();
+        if(packet == null) return;
+        while( !(packet instanceof JointPacket) ) {
+            // TODO: this discards everything and we don't want to do that
+            packet = myBluetoothService.getLastPacket();
+            if(packet == null) return;
+        }
+        Joint rightHand = ((JointPacket) packet).getJoint(Joint.JointType.HandRight);
+        if(rightHand.state == Joint.JointTrackingState.NotTracked) return;
+
+        Matrix.translateM(modelRightHand, 0, rightHand.X, rightHand.Y, rightHand.Z);
 
         checkGLError("updateRightHandPosition");
     }

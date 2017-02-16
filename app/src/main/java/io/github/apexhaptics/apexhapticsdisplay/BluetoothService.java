@@ -28,12 +28,16 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.util.LinkedList;
+import java.util.Queue;
 import java.util.Set;
 import java.util.UUID;
 
-import io.github.apexhaptics.apexhapticsdisplay.utilities.Joint;
-
-import static android.R.attr.right;
+import io.github.apexhaptics.apexhapticsdisplay.datatypes.BluetoothDataPacket;
+import io.github.apexhaptics.apexhapticsdisplay.datatypes.Joint;
+import io.github.apexhaptics.apexhapticsdisplay.datatypes.JointPacket;
+import io.github.apexhaptics.apexhapticsdisplay.datatypes.Marker;
+import io.github.apexhaptics.apexhapticsdisplay.datatypes.MarkerPacket;
 
 /**
  * This class does all the work for setting up and managing Bluetooth
@@ -66,12 +70,7 @@ public class BluetoothService {
     public static final int STATE_CONNECTING = 2; // now initiating an outgoing connection
     public static final int STATE_CONNECTED = 3;  // now connected to a remote device
 
-    public Joint headJoint = new Joint();
-    public Joint shoulderCenter = new Joint();
-    public Joint rightWrist = new Joint();
-    public Joint rightHand = new Joint();
-    public Joint leftWrist = new Joint();
-    public Joint leftHand = new Joint();
+    private LinkedList<BluetoothDataPacket> receivedData = new LinkedList<>();
 
     /**
      * Constructor. Prepares a new BluetoothChat session.
@@ -105,6 +104,14 @@ public class BluetoothService {
                 Log.d(TAG, "Bluetooth Device MAC: " + deviceHardwareAddress);
                 connect(device); // Temporarily connecting to every device. This can be changed
             }
+        }
+    }
+
+    public BluetoothDataPacket getLastPacket() {
+        try {
+            return receivedData.remove();
+        } catch (Exception e) {
+            return null;
         }
     }
 
@@ -470,7 +477,7 @@ public class BluetoothService {
 
         public void run() {
             Log.i(TAG, "BEGIN mConnectedThread");
-            String[] coords;
+            String[] packetData;
 
             // Keep listening to the InputStream while connected
             while (mState == STATE_CONNECTED) {
@@ -478,25 +485,22 @@ public class BluetoothService {
                     // Send the obtained bytes to the UI Activity
 //                    mHandler.obtainMessage(Constants.MESSAGE_READ, bytes, -1, buffer)
 //                            .sendToTarget();
-                    coords = mmBufferedReader.readLine().split(",");
-                    headJoint.setCoords(Float.parseFloat(coords[1]),
-                            Float.parseFloat(coords[3]),
-                            Float.parseFloat(coords[5]));
-                    shoulderCenter.setCoords(Float.parseFloat(coords[7]),
-                            Float.parseFloat(coords[9]),
-                            Float.parseFloat(coords[11]));
-                    rightWrist.setCoords(Float.parseFloat(coords[13]),
-                            Float.parseFloat(coords[15]),
-                            Float.parseFloat(coords[17]));
-                    rightHand.setCoords(Float.parseFloat(coords[19]),
-                            Float.parseFloat(coords[21]),
-                            Float.parseFloat(coords[23]));
-                    leftWrist.setCoords(Float.parseFloat(coords[25]),
-                            Float.parseFloat(coords[27]),
-                            Float.parseFloat(coords[31]));
-                    leftHand.setCoords(Float.parseFloat(coords[33]),
-                            Float.parseFloat(coords[35]),
-                            Float.parseFloat(coords[37]));
+                    packetData = mmBufferedReader.readLine().split(",");
+                    BluetoothDataPacket packet = null;
+                    switch (packetData[0]) {
+                        case JointPacket.packetString:
+                            packet = parseJointPacket(packetData);
+                            break;
+                        case MarkerPacket.packetString:
+                            packet = parseMarkerPacket(packetData);
+                            break;
+                        case "":
+                            continue;
+                        default:
+                            Log.e(TAG, "Unknown packet type");
+                            continue;
+                    }
+                    receivedData.add(packet);
                 } catch (IOException e) {
                     Log.e(TAG, "disconnected", e);
                     connectionLost();
@@ -507,6 +511,54 @@ public class BluetoothService {
                     Log.e(TAG, "Incorrectly formatted message");
                 }
             }
+        }
+
+        private JointPacket parseJointPacket(String[] data) {
+            JointPacket packet = new JointPacket();
+            try {
+                for (int i = 1; i < data.length; i+=6){
+                    if(!data[i].equals(JointPacket.separator)) return packet;
+
+                    packet.addJoint(Joint.JointType.values()[Integer.parseInt(data[i+1])],
+                            Joint.JointTrackingState.values()[Integer.parseInt(data[i+2])],
+                            Float.parseFloat(data[i+3]),
+                            Float.parseFloat(data[i+4]),
+                            Float.parseFloat(data[i+5]));
+                }
+            } catch (ArrayIndexOutOfBoundsException e) {
+                Log.e(TAG, "Incorrectly formatted JOINT message");
+            }
+            return packet;
+        }
+
+        private MarkerPacket parseMarkerPacket(String[] data) {
+            MarkerPacket packet = new MarkerPacket();
+            int i = 1;
+
+            try {
+                while (i < data.length){
+                    if(!data[i].equals(MarkerPacket.separator)) return packet;
+
+                    if((i += 5) < data.length || !data[i].equals(MarkerPacket.normalString)) {
+                        packet.addMarker(Marker.MarkerType.values()[Integer.parseInt(data[i-4])],
+                                Float.parseFloat(data[i-3]),
+                                Float.parseFloat(data[i-2]),
+                                Float.parseFloat(data[i-1]));
+                    } else {
+                        packet.addMarker(Marker.MarkerType.values()[Integer.parseInt(data[i-4])],
+                                Float.parseFloat(data[i-3]),
+                                Float.parseFloat(data[i-2]),
+                                Float.parseFloat(data[i-1]),
+                                Float.parseFloat(data[i+1]),
+                                Float.parseFloat(data[i+2]),
+                                Float.parseFloat(data[i+3]));
+                        i += 4;
+                    }
+                }
+            } catch (ArrayIndexOutOfBoundsException e) {
+                Log.e(TAG, "Incorrectly formatted MARKER message");
+            }
+            return packet;
         }
 
         /**

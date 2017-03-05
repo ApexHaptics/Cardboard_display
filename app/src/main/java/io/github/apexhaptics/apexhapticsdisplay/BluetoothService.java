@@ -107,7 +107,7 @@ public class BluetoothService {
     }
 
     public BluetoothDataPacket getLastPacket() {
-        return receivedData.poll()
+        return receivedData.poll();
     }
 
     /**

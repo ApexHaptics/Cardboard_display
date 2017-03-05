@@ -1,6 +1,6 @@
 package io.github.apexhaptics.apexhapticsdisplay.datatypes;
 
-import java.util.HashMap;
+import static android.R.attr.angle;
 
 /**
  * Created by Jaden on 2017-02-15.
@@ -9,9 +9,15 @@ import java.util.HashMap;
 public class MarkerPacket extends BluetoothDataPacket {
     public static final String packetString = "MLoc";
     public static final String headString = "HED";
-    public Head head = null;
+    public static final String eefString = "EEF";
+    public MarkerHead markerHead = null;
+    public MarkerEndEffector markerEndEffector = null;
 
     public void addHead(float x, float y, float z, float angle) {
-        head = new Head(x,y,z,angle);
+        markerHead = new MarkerHead(x,y,z,angle);
+    }
+
+    public void addEndEffector(float x, float y, float z) {
+        markerEndEffector = new MarkerEndEffector(x,y,z);
     }
 }

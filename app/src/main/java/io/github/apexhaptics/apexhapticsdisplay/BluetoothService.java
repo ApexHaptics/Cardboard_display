@@ -543,6 +543,12 @@ public class BluetoothService {
                             Float.parseFloat(data[i+4]));
                     i += 5;
                 }
+                if(data[i].equals(MarkerPacket.eefString)) {
+                    packet.addEndEffector(Float.parseFloat(data[i+1]),
+                            Float.parseFloat(data[i+2]),
+                            Float.parseFloat(data[i+3]));
+                    i += 4;
+                }
             } catch (ArrayIndexOutOfBoundsException e) {
                 Log.e(TAG, "Incorrectly formatted MARKER message");
             }

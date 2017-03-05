@@ -8,6 +8,7 @@ import java.util.Date;
 
 public abstract class BluetoothDataPacket {
     public Date createDate;
+    public int deltaT; // Time in MS since last. 0 if the first
     BluetoothDataPacket() {
         createDate = new Date();
     }

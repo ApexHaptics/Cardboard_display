@@ -28,7 +28,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.util.LinkedList;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.Set;
 import java.util.UUID;
 
@@ -69,7 +69,7 @@ public class BluetoothService {
     public static final int STATE_CONNECTING = 2; // now initiating an outgoing connection
     public static final int STATE_CONNECTED = 3;  // now connected to a remote device
 
-    private LinkedList<BluetoothDataPacket> receivedData = new LinkedList<>();
+    private ConcurrentLinkedQueue<BluetoothDataPacket> receivedData = new ConcurrentLinkedQueue<>();
 
     /**
      * Constructor. Prepares a new BluetoothChat session.
@@ -107,11 +107,7 @@ public class BluetoothService {
     }
 
     public BluetoothDataPacket getLastPacket() {
-        try {
-            return receivedData.remove();
-        } catch (Exception e) {
-            return null;
-        }
+        return receivedData.poll()
     }
 
     /**

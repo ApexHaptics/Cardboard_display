@@ -35,8 +35,8 @@ import java.util.UUID;
 import io.github.apexhaptics.apexhapticsdisplay.datatypes.BluetoothDataPacket;
 import io.github.apexhaptics.apexhapticsdisplay.datatypes.Joint;
 import io.github.apexhaptics.apexhapticsdisplay.datatypes.JointPacket;
-import io.github.apexhaptics.apexhapticsdisplay.datatypes.Head;
-import io.github.apexhaptics.apexhapticsdisplay.datatypes.HeadPacket;
+import io.github.apexhaptics.apexhapticsdisplay.datatypes.MarkerPacket;
+import io.github.apexhaptics.apexhapticsdisplay.datatypes.RobotKinPosPacket;
 
 /**
  * This class does all the work for setting up and managing Bluetooth
@@ -490,8 +490,11 @@ public class BluetoothService {
                         case JointPacket.packetString:
                             packet = parseJointPacket(packetData);
                             break;
-                        case HeadPacket.packetString:
+                        case MarkerPacket.packetString:
                             packet = parseMarkerPacket(packetData);
+                            break;
+                        case RobotKinPosPacket.packetString:
+                            packet = parseRobotKinPosPacket(packetData);
                             break;
                         case "":
                             continue;
@@ -531,23 +534,37 @@ public class BluetoothService {
             return packet;
         }
 
-        private HeadPacket parseMarkerPacket(String[] data) {
-            HeadPacket packet = new HeadPacket();
+        private MarkerPacket parseMarkerPacket(String[] data) {
+            MarkerPacket packet = new MarkerPacket();
             packet.deltaT = Integer.parseInt(data[1]);
             int i = 2;
 
             try {
-                while (i < data.length){
-                    if(data[i].equals(HeadPacket.headString)) {
-                        packet.addHead(Float.parseFloat(data[i+1]),
-                                Float.parseFloat(data[i+2]),
-                                Float.parseFloat(data[i+3]),
-                                Float.parseFloat(data[i+4]));
-                        i += 5;
-                    }
+                if(data[i].equals(MarkerPacket.headString)) {
+                    packet.addHead(Float.parseFloat(data[i+1]),
+                            Float.parseFloat(data[i+2]),
+                            Float.parseFloat(data[i+3]),
+                            Float.parseFloat(data[i+4]));
+                    i += 5;
                 }
             } catch (ArrayIndexOutOfBoundsException e) {
                 Log.e(TAG, "Incorrectly formatted MARKER message");
+            }
+            return packet;
+        }
+
+        private RobotKinPosPacket parseRobotKinPosPacket(String[] data) {
+            RobotKinPosPacket packet = new RobotKinPosPacket();
+            packet.deltaT = Integer.parseInt(data[1]);
+            int i = 2;
+
+            try {
+                packet.setPos(Float.parseFloat(data[i]),
+                        Float.parseFloat(data[i+1]),
+                        Float.parseFloat(data[i+2]));
+                i += 3;
+            } catch (ArrayIndexOutOfBoundsException e) {
+                Log.e(TAG, "Incorrectly formatted ROBOT_KIN_POS message");
             }
             return packet;
         }
